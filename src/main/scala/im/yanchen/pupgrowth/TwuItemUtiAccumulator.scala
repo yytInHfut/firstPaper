@@ -25,7 +25,7 @@ class TwuItemUtiAccumulator extends AccumulatorV2[Sequence, mutable.Map[Int, (Lo
       var uti = 0
       val twu = seq.utility
       while (seq.hasNext(pos)) {
-         val (itemUtil, temPos) = seq.getByIndexTuple(pos)
+         val (itemUtil, temPos) = seq.getUtil_NextPosByIndexTuple(pos)
         pos = temPos
         if (uti < itemUtil)
           uti = itemUtil

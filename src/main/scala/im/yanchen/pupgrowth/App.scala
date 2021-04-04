@@ -17,23 +17,27 @@ object App {
   def grouping(items: List[Int], pnum: Int): Map[Int, Int] = {
 
     var mp = Map[Int, Int]()
-
-    var i = 0
-    var inc = 1
-    var flag = false
-    for (x <- items) {
-      mp.put(x, i)
-      i += inc
-      if (i == 0 || i == pnum - 1) {
-        if (flag == false) {
-          inc = 0
-          flag = true
-        } else {
-          if (i == 0)
-            inc = 1
-          else
-            inc = -1
-          flag = false
+    if(pnum == 1){
+      for(i <- items)
+      mp.put(i,0)
+    }else {
+      var i = 0
+      var inc = 1
+      var flag = false
+      for (x <- items) {
+        mp.put(x, i)
+        i += inc
+        if (i == 0 || i == pnum - 1) {
+          if (flag == false) {
+            inc = 0
+            flag = true
+          } else {
+            if (i == 0)
+              inc = 1
+            else
+              inc = -1
+            flag = false
+          }
         }
       }
     }
@@ -90,19 +94,19 @@ object App {
       })
     //revise the sequence by deleting the low TWU item, and update the seqRDD simultaneously
     val threshUtil = (totalUtil.value * theta).toLong
-    val lowTwuItemlist = ListBuffer()
+    val lowTwuItemlist = ListBuffer[Int]()
     val refinedItemUtilAndTwu: mutable.Map[Int, (Long, Long)] = mutable.Map()
     for((item, (uti,twu)) <- itemUtilAndTwu.value){
       if(twu >= threshUtil)
         refinedItemUtilAndTwu(item)=(uti,twu)
       else 
-        lowTwuItemlist += item
+        lowTwuItemlist.append(item)
     }
     
     seqRDD.foreach(
       seq => {
         for(i <- lowTwuItemlist){
-            seq.refineSeqRemainUtil(i)
+            seq.refineSeq(i)
         }
       }
     )
@@ -136,13 +140,15 @@ object App {
     seqRDD.unpersist(false)
     if (parNum != 1)
       kset = kset.partitionBy(new BinPartitioner(parNum))
-    val gset = kset.groupByKey()
+    val gset = kset.groupByKey().collect()
 
     //execute the pattern miner program
     val results = gset.flatMap(x => {
       val hm = new HUSP_ULL(threshBroad.value)
       hm.mine(x._2, glistsBroad.value, x._1, itemTwuAndUtilBroad.value)
     })
+
+//    val tuples: Array[(String, Long)] = results.collect()
 
 
     sc.stop()

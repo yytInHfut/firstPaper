@@ -9,10 +9,10 @@ class Sequence {
   val headTable: mutable.Map[Int, (Int, Int)] = mutable.Map()
   val UpInfo : mutable.ListBuffer[Array[((Int, Int), (Int, (Int, Int)))]] = mutable.ListBuffer()
 
-  var prefix : Array[Array[Int]] = null
-  var ull : mutable.ListBuffer[((Int,Int), Long, Long)] = null
-  val peu: Long = 0
-  val prefixUtil: Long = 0
+  var prefix : Array[Int] = null
+  var ull : mutable.ListBuffer[((Int,Int), Long, Long)] = mutable.ListBuffer[((Int,Int), Long, Long)]()
+  var peu: Long = 0
+  var prefixUtil: Long = 0
 
   def this(line: String) = {
     this()
@@ -35,7 +35,7 @@ class Sequence {
         val pos = headTable.getOrElse(item, (-1, -1))
 
         tempList = (remainUti, pos) :: tempList
-        headTable + (item, (seqLen, itemSetLen))
+        headTable.put(item, (seqLen, itemSetLen))
         remainUti += util
         itemSetLen -= 1
       }
@@ -75,12 +75,13 @@ class Sequence {
       true
   }
 
-  def refineSeqRemainUtil(itemToDelete : Int)={
+  def refineSeq(itemToDelete : Int)={
     val pos: (Int, Int) = headTable.getOrElse(itemToDelete, (-1, -1))
     if(pos != (-1,-1)){
       headTable - itemToDelete
       val posMapUtilToMinus = getItemPosMapUtilToMinus(pos)
       updateSeqRemainUtil(posMapUtilToMinus)
+      updateSeqUll(posMapUtilToMinus)
     }
   }
 
@@ -119,28 +120,121 @@ class Sequence {
     }
   }
 
-  def updateULL(exItem: Int, exType: Char): Unit ={
-    var tempUtil = 0
-    var tempPeu = 0
-    if(prefix == null){
-      if(headTable.contains(exItem)){
-        var pos = headTable(exItem)
-        while (hasNext(pos)){
+  def updateSeqUll( posMapUtilToMinus : ListBuffer[((Int, Int), Int)]): Unit ={
+    for(i <- 0 until ull.size){
+      val (pos,uti,tempPeu) = ull(i)
+      breakable{
+        for((anchor, utilToMinus) <- posMapUtilToMinus){
+          if(pos._1 < anchor._1 || (pos._1 == anchor._1 && pos._2 < anchor._2)){
+            if(peu == tempPeu)
+              peu -= utilToMinus
+            ull(i) = (pos, uti, tempPeu - utilToMinus)
+            break()
+          }
+        }
+      }
+    }
+  }
+
+  def creatULL(newPrefix: Array[Int], exType: Char): Unit ={
+    var tempUtil = 0L
+    var tempPeu = 0L
+    val exItem = newPrefix.last
+
+    if(prefix == null) {
+      var pos = headTable(exItem)
+      if (headTable.contains(exItem)) {
+        while (hasNext(pos)) {
           val (uti, remain, temPos) = getUti_RemainUtil_NextPosByIndexTuple(pos)
-          val peu = if(remain > 0) uti + remain else 0
+          val peu = if (remain > 0) uti + remain else 0
 
-          if(uti > tempUtil) tempUtil = uti
-          if(peu > tempPeu) tempPeu = peu
+          if (uti > tempUtil) tempUtil = uti
+          if (peu > tempPeu) tempPeu = peu
 
-          ull += (pos, uti, peu)
+          ull.append((pos, uti, peu))
           pos = temPos
         }
       }
     }
     else {
+      val pos = headTable(exItem)
 
+      //I-Extension
+      if(exType == 'I'){
+        val newList = mutable.ListBuffer[((Int,Int),Long,Long)]()
+        var oldUllIndex = 0
+        val oldUllSize = ull.size
+        var tempPos = pos
+
+        while (oldUllIndex < oldUllSize && hasNext(tempPos)){
+          val ((oldPos,_), olduti, _) = ull(oldUllIndex)
+          if(tempPos._1 == oldPos){
+            val ((_,util),(re,_)) = UpInfo(tempPos._1)(tempPos._2)
+            val eleUtil = olduti + util
+
+            newList.append((tempPos, eleUtil, re))
+            if(tempUtil < eleUtil) tempUtil = eleUtil
+            if(tempPeu < re) tempPeu = re
+
+            tempPos = getUtil_NextPosByIndexTuple(tempPos)._2
+            oldUllIndex += 1
+          }
+          else if(tempPos._1 < oldPos){
+            tempPos = getUtil_NextPosByIndexTuple(tempPos)._2
+          }
+          else {
+            oldUllIndex += 1
+          }
+        }
+        ull = newList
+      }//S-Extension
+      else if(exType == 'S'){
+        val newList = mutable.ListBuffer[((Int,Int),Long,Long)]()
+        var oldUllIndex = 0
+        val oldUllSize = ull.size
+        var tempPos = pos
+        var eleUtil = 0L
+
+        while (oldUllIndex < oldUllSize && hasNext(tempPos)){
+          val ((oldPos,_), olduti, _) = ull(oldUllIndex)
+
+          if(tempPos._1 > oldPos){
+            eleUtil = if(eleUtil < olduti) olduti else eleUtil
+            if(oldUllIndex == oldUllSize - 1){
+              val ((_,util),(re,_)) = UpInfo(tempPos._1)(tempPos._2)
+              eleUtil += util
+              val elePeu = re + eleUtil
+              if(tempUtil < eleUtil) tempUtil = eleUtil
+              if(tempPeu < elePeu) tempPeu = elePeu
+              newList.append((tempPos, eleUtil, re))
+            }
+
+            oldUllIndex += 1
+          }
+          else if(tempPos._1 < oldPos){
+            val ((_,util),(re,_)) = UpInfo(tempPos._1)(tempPos._2)
+            eleUtil += util
+            val elePeu = re + eleUtil
+            if(tempUtil < eleUtil) tempUtil = eleUtil
+            if(tempPeu < elePeu) tempPeu = elePeu
+            newList.append((tempPos, eleUtil, re))
+            eleUtil = 0
+            tempPos = getUtil_NextPosByIndexTuple(tempPos)._2
+          }
+          else {
+            tempPos = getUtil_NextPosByIndexTuple(tempPos)._2
+          }
+        }
+        ull = newList
+      }
+      else {
+        println("illegal extension type")
+      }
     }
 
+    prefixUtil = tempUtil
+    peu = tempPeu
+    prefix = newPrefix
   }
 
 
