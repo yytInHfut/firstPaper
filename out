@@ -1,0 +1,75 @@
+Running time: 3500
+Total HUIs: 8
+utotal: 96
+thresUtil: 30
+parNum: 1
+2 5#UTIL: 31.0
+4 2#UTIL: 30.0
+4 2 5#UTIL: 36.0
+4 2 5 3#UTIL: 40.0
+6 4 2 1 5 3#UTIL: 30.0
+1 5 3#UTIL: 31.0
+2 5 3#UTIL: 37.0
+4 2 3#UTIL: 34.0
+
+******************************
+Running time: 3750
+Total HUIs: 8
+utotal: 96
+thresUtil: 30
+parNum: 4
+2 5#UTIL: 31.0
+4 2#UTIL: 30.0
+4 2 5#UTIL: 36.0
+4 2 5 3#UTIL: 40.0
+6 4 2 1 5 3#UTIL: 30.0
+1 5 3#UTIL: 31.0
+2 5 3#UTIL: 37.0
+4 2 3#UTIL: 34.0
+
+******************************
+Running time: 3670
+Total HUIs: 8
+utotal: 96
+thresUtil: 30
+parNum: 4
+2 5#UTIL: 31.0
+4 2#UTIL: 30.0
+4 2 5#UTIL: 36.0
+4 2 5 3#UTIL: 40.0
+6 4 2 1 5 3#UTIL: 30.0
+1 5 3#UTIL: 31.0
+2 5 3#UTIL: 37.0
+4 2 3#UTIL: 34.0
+
+******************************
+Running time: 3360
+Total HUIs: 8
+utotal: 96
+thresUtil: 30
+parNum: 1
+2 5#UTIL: 31.0
+4 2#UTIL: 30.0
+4 2 5#UTIL: 36.0
+4 2 5 3#UTIL: 40.0
+6 4 2 1 5 3#UTIL: 30.0
+1 5 3#UTIL: 31.0
+2 5 3#UTIL: 37.0
+4 2 3#UTIL: 34.0
+
+******************************
+Running time: 3820
+Total HUIs: 8
+utotal: 96
+thresUtil: 30
+parNum: 8
+2 5#UTIL: 31.0
+4 2#UTIL: 30.0
+4 2 5#UTIL: 36.0
+4 2 5 3#UTIL: 40.0
+6 4 2 1 5 3#UTIL: 30.0
+1 5 3#UTIL: 31.0
+2 5 3#UTIL: 37.0
+4 2 3#UTIL: 34.0
+
+******************************
