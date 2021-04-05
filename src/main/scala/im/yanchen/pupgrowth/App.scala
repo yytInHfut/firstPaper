@@ -17,10 +17,10 @@ object App {
   def grouping(items: List[Int], pnum: Int): Map[Int, Int] = {
 
     var mp = Map[Int, Int]()
-    if(pnum == 1){
-      for(i <- items)
-      mp.put(i,0)
-    }else {
+    if (pnum == 1) {
+      for (i <- items)
+        mp.put(i, 0)
+    } else {
       var i = 0
       var inc = 1
       var flag = false
@@ -58,7 +58,7 @@ object App {
 
   def main(args: Array[String]) {
 
-    var startTimestamp = System.currentTimeMillis()
+    val startTimestamp = System.currentTimeMillis()
 
     val theta = args(1).toDouble
     val parNum = args(2).toInt
@@ -96,17 +96,17 @@ object App {
     val threshUtil = (totalUtil.value * theta).toLong
     val lowTwuItemlist = ListBuffer[Int]()
     val refinedItemUtilAndTwu: mutable.Map[Int, (Long, Long)] = mutable.Map()
-    for((item, (uti,twu)) <- itemUtilAndTwu.value){
-      if(twu >= threshUtil)
-        refinedItemUtilAndTwu(item)=(uti,twu)
-      else 
+    for ((item, (uti, twu)) <- itemUtilAndTwu.value) {
+      if (twu >= threshUtil)
+        refinedItemUtilAndTwu(item) = (uti, twu)
+      else
         lowTwuItemlist.append(item)
     }
-    
+
     seqRDD.foreach(
       seq => {
-        for(i <- lowTwuItemlist){
-            seq.refineSeq(i)
+        for (i <- lowTwuItemlist) {
+          seq.refineSeq(i)
         }
       }
     )
@@ -140,7 +140,7 @@ object App {
     seqRDD.unpersist(false)
     if (parNum != 1)
       kset = kset.partitionBy(new BinPartitioner(parNum))
-    val gset = kset.groupByKey().collect()
+    val gset = kset.groupByKey()
 
     //execute the pattern miner program
     val results = gset.flatMap(x => {
@@ -148,8 +148,33 @@ object App {
       hm.mine(x._2, glistsBroad.value, x._1, itemTwuAndUtilBroad.value)
     })
 
-//    val tuples: Array[(String, Long)] = results.collect()
+    val fresults = results.collect()
 
+    val endTimestamp = System.currentTimeMillis()
+
+    println("glists: ")
+    for ((key, value) <- glists) {
+      println("\t" + key + ": " + value)
+    }
+    println("Thres: " + threshUtil)
+    println("Total HUIs: " + fresults.size)
+    println("Running time: " + (endTimestamp - startTimestamp))
+
+    //          var writer = new BufferedWriter(new FileWriter(outputf, true))
+    //
+    //          writer.write("Running time: " + (endTimestamp - startTimestamp) + "\n")
+    //          writer.write("Total HUIs: " + fresults.size + "\n")
+    //          writer.write("utotal: " + utotal + "\n")
+    //          writer.write("thresUtil: " + thresUtil.toInt + "\n")
+    //          writer.write("parNum: " + parNum + "\n")
+    //
+    //          for ((key, value) <- fresults) {
+    //            writer.write("" + key + "#UTIL: " + value + "\n")
+    //          }
+    //
+    //          writer.write("\n******************************" + "\n")
+    //
+    //          writer.close()
 
     sc.stop()
 
