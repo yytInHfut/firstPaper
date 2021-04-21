@@ -75,6 +75,7 @@ class HUSP_ULL(val threshUtil: Long) {
       //      val lastItemList = ListBuffer[Int]()
       //      for((itemPos,_,_) <- seq.ull)
       //        lastItemList.append(itemPos._1)
+      if (seq.ull.size > 0) {
       val startConcatPos = seq.ull(0)._1._1
       for ((item, pos) <- seq.headTable) {
         //both i-extension and s-extension available
@@ -96,6 +97,8 @@ class HUSP_ULL(val threshUtil: Long) {
           }
         }
       }
+    }
+      else println("被删干净了")
       map
     })
 
@@ -121,20 +124,23 @@ class HUSP_ULL(val threshUtil: Long) {
     var las_Smap = mutable.Map[Int, (Long, List[Sequence])]()
 
     las_Smap = Seqs.foldLeft(las_Smap)((map, seq) => {
-      val startConcatPos = seq.ull(0)._1._1
-      for ((item, pos) <- seq.headTable) {
-        var tempPos = pos
-        breakable {
-          while (seq.hasNext(tempPos)) {
-            if (tempPos._1 > startConcatPos) {
-              val (localPeu, localSeqs) = map.getOrElse(item, (0L, Nil))
-              map(item) = (localPeu + seq.peu, localSeqs.::(seq))
-              break()
+      if(seq.ull.size > 0) {
+        val startConcatPos = seq.ull(0)._1._1
+        for ((item, pos) <- seq.headTable) {
+          var tempPos = pos
+          breakable {
+            while (seq.hasNext(tempPos)) {
+              if (tempPos._1 > startConcatPos) {
+                val (localPeu, localSeqs) = map.getOrElse(item, (0L, Nil))
+                map(item) = (localPeu + seq.peu, localSeqs.::(seq))
+                break()
+              }
+              tempPos = seq.getUtil_NextPosByIndexTuple(tempPos)._2
             }
-            tempPos = seq.getUtil_NextPosByIndexTuple(tempPos)._2
           }
         }
       }
+      else println("被删干净了")
       map
     })
 

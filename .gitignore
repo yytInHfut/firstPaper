@@ -9,3 +9,5 @@ release.properties
 .idea/
 *.iml
 *.txt
+/src/main/scala/ca/
+/src/main/scala/ca/pfv/spmf/

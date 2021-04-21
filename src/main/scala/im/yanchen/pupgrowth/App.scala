@@ -75,7 +75,8 @@ object App {
     val sc = new SparkContext(conf)
 
     //    var lines = sc.textFile(args(0)).repartition(parNum)
-    var lines = sc.textFile("datas")
+    val lines = sc.textFile(args(0))
+    lines.mapPartitionsWithIndex((nodeId, data) => )
     val seqRDD: RDD[Sequence] = lines.map(new Sequence(_))
     seqRDD.persist()
 
@@ -103,11 +104,12 @@ object App {
         lowTwuItemlist.append(item)
     }
 
-    seqRDD.foreach(
+    val refinedSeq = seqRDD.map(
       seq => {
         for (i <- lowTwuItemlist) {
           seq.refineSeq(i)
         }
+        seq
       }
     )
 
@@ -123,7 +125,7 @@ object App {
     val glistsBroad = sc.broadcast(glists)
 
     //Redistribute data to nodes
-    var kset = seqRDD.flatMap { x => {
+    var kset = refinedSeq.flatMap { x => {
       val tlist = ArrayBuffer[(Int, Sequence)]()
       val added = Map[Int, Boolean]()
       for ((i, _) <- x.headTable) {

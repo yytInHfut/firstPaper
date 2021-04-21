@@ -93,14 +93,20 @@ class Sequence extends Cloneable {
 
   def refineSeq(itemToDelete: Int) = {
     val pos: (Int, Int) = headTable.getOrElse(itemToDelete, (-1, -1))
-    val prefixLastPos = headTable.get(prefix.last).get
+    var prefixLastPos = (0,0)
+    var prefixLastItem = UpInfo(0)(0)._1._1
+    if(prefix != null){
+      prefixLastItem = prefix.last
+      if(headTable.contains(prefixLastItem))
+        prefixLastPos = headTable.get(prefixLastItem).get
+    }
     if (pos != (-1, -1)) {
       headTable -= itemToDelete
       var tempPos = pos
       while (tempPos < prefixLastPos && hasNext(tempPos)) {
         tempPos = getUtil_NextPosByIndexTuple(tempPos)._2
       }
-      if (tempPos > prefixLastPos || (tempPos == prefixLastPos && prefix.last < itemToDelete)) {
+      if (tempPos > prefixLastPos || (tempPos == prefixLastPos && prefixLastItem < itemToDelete)) {
         if (UpInfo(pos._1)(pos._2)._2._1 != 0) {
 
           val posMapUtilToMinus = getItemPosMapUtilToMinus(pos)
