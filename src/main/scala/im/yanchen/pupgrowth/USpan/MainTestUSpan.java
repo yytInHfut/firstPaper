@@ -27,7 +27,7 @@ public class MainTestUSpan {
 		algo.setMaxPatternLength(4);
 		
 		// run the algorithm
-		algo.runAlgorithm(input, output, minutil);
+//		algo.runAlgorithm(input, output, minutil);
 
 		
 		// print statistics

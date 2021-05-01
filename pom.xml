@@ -41,12 +41,17 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>im.yanchen.pupgrowth.App</mainClass>
+                            <mainClass>im.yanchen.pupgrowth.USpan.AppUspan</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+<!--                    <descriptors>-->
+
+<!--                        <descriptor>assemble.xml</descriptor>-->
+
+<!--                    </descriptors>-->
                 </configuration>
                 <executions>
                     <execution>

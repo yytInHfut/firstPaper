@@ -76,7 +76,7 @@ object App {
 
     //    var lines = sc.textFile(args(0)).repartition(parNum)
     val lines = sc.textFile(args(0))
-    lines.mapPartitionsWithIndex((nodeId, data) => )
+//    lines.mapPartitionsWithIndex((nodeId, data) => )
     val seqRDD: RDD[Sequence] = lines.map(new Sequence(_))
     seqRDD.persist()
 

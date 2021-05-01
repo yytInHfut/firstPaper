@@ -20,7 +20,7 @@ import java.util.Map.Entry;
  * 
  * @author Philippe Fournier-Viger, 2015
  */
-public class AlgoUSpan {
+public class AlgoUSpan implements Serializable{
 
 	/** the time the algorithm started */
 	long startTimestamp = 0; 
@@ -44,7 +44,7 @@ public class AlgoUSpan {
 	final boolean SAVE_RESULT_EASIER_TO_READ_FORMAT = false;
 
 	/** the minUtility threshold **/
-	int minUtility = 0;
+	long minUtility;
 	
 	/** max pattern length **/
 	int maxPatternLength = 1000;
@@ -52,6 +52,13 @@ public class AlgoUSpan {
 	/** the input file path **/
 	String input;
 
+	int partitionId;
+
+	TreeNode theTree = new TreeNode();
+
+	Map<String,List<Object>> result = new HashMap<String, List<Object>>();
+
+	List<QMatrix> database;
 	/**
 	 * Default constructor
 	 */
@@ -63,16 +70,16 @@ public class AlgoUSpan {
 	 * Run the USPAN algorithm
 	 * @param input the input file path
 	 * @param output the output file path
-	 * @param minUtility the minimum utility threshold
 	 * @throws IOException exception if error while writing the file
 	 */
-	public void runAlgorithm(String input, String output, int minUtility) throws IOException {
+	public void runAlgorithm(int partitionID) throws IOException {
+		System.out.println("nodeId =" + partitionID+ ", localThresh = " + minUtility);
 		// reset maximum
 		MemoryLogger.getInstance().reset();
 		
 		// input path
 //		this.input = input;
-		
+		this.partitionId=partitionID;
 		// initialize the buffer for storing the current itemset
 		patternBuffer = new int[BUFFERS_SIZE];
 		
@@ -80,73 +87,88 @@ public class AlgoUSpan {
 		startTimestamp = System.currentTimeMillis();
 		
 		// create a writer object to write results to file
-		writer = new BufferedWriter(new FileWriter(output));
-		
+//		writer = new BufferedWriter(new FileWriter(output));
+
 		// save the minimum utility threshold
-		this.minUtility = minUtility;
 
 		// create a map to store the SWU of each item
 		// key: item  value: the swu of the item
+
+		// check the memory usage
+		MemoryLogger.getInstance().checkMemory();
+
+		// Mine the database recursively using the USpan procedure
+		// This procedure is the USPan procedure optimized for the first recursion
+		uspanFirstTime(patternBuffer, 0);
+		// check the memory usage again and close the file.
+		MemoryLogger.getInstance().checkMemory();
+		// close output file
+//		writer.close();
+		// record end time
+		endTimestamp = System.currentTimeMillis();
+	}
+
+	public void getqMatrices(List<String> input, double minUtilityRatio) {
 		final Map<Integer, Integer> mapItemToSWU = new HashMap<Integer, Integer>();
-		
-		//Tin added:		
+
+		//Tin added:
 		List<Integer> consideredItems = new ArrayList<Integer>();
 
 		// ==========  FIRST DATABASE SCAN TO IDENTIFY PROMISING ITEMS =========
 		// We scan the database a first time to calculate the SWU of each item.
 		int sequenceCount = 0;
-		BufferedReader myInput = null;
-		String thisLine;
+		Long localPartitionUtility = 0L;
+//		BufferedReader myInput = null;
 		try {
 			// prepare the object for reading the file
-			myInput = new BufferedReader(new InputStreamReader( new FileInputStream(new File(input))));
+//			myInput = new BufferedReader(new InputStreamReader( new FileInputStream(new File(input))));
 			// for each line (transaction) until the end of file
-			while ((thisLine = myInput.readLine()) != null) {
+			for(String thisLine : input){
 				// if the line is a comment, is  empty or is a kind of metadata, skip it
 				if (thisLine.isEmpty() == true || thisLine.charAt(0) == '#' || thisLine.charAt(0) == '%' || thisLine.charAt(0) == '@') {
 					continue;
 				}
-				
+
 				// split the transaction according to the " " separator
-				String tokens[] = thisLine.split(" "); 
-				
+				String tokens[] = thisLine.split(" ");
+
 				// get the sequence utility (the last token on the line)
 				String sequenceUtilityString = tokens[tokens.length-1];
 				int positionColons = sequenceUtilityString.indexOf(':');
 				int sequenceUtility = Integer.parseInt(sequenceUtilityString.substring(positionColons+1));
-				
+				localPartitionUtility += sequenceUtility;
 				// Then read each token from this sequence (except the last three tokens
 				// which are -1 -2 and the sequence utility)
 				for(int i=0; i< tokens.length -3; i++) {
 					String currentToken = tokens[i];
-					// if the current token is not -1 
+					// if the current token is not -1
 					if(currentToken.length() !=0 && currentToken.charAt(0) != '-') {
 						// find the left brack
 						int positionLeftBracketString = currentToken.indexOf('[');
 						// get the item
 						String itemString = currentToken.substring(0, positionLeftBracketString);
 						Integer item = Integer.parseInt(itemString);
-						
-						//Tin added:		
-						if (!consideredItems.contains(item)) 
+
+						//Tin added:
+						if (!consideredItems.contains(item))
 						{
 							consideredItems.add(item);
-						
+
 							// get the current SWU of that item
 							Integer swu = mapItemToSWU.get(item);
-							
+
 							// add the utility of sequence utility to the swu of this item
 							swu = (swu == null)?  sequenceUtility : swu + sequenceUtility;
 							mapItemToSWU.put(item, swu);
 //							System.out.println(" -> " + swu);
 						}
-//						else System.out.println(item + " is already considered in the same (line) input sequence");								
+//						else System.out.println(item + " is already considered in the same (line) input sequence");
 					}
 				}
-				
+
 				// Philippe added:
 				consideredItems.clear();
-				
+
 				// increase sequence count
 				sequenceCount++;
 			}
@@ -154,11 +176,13 @@ public class AlgoUSpan {
 			// catches exception if error while reading the input file
 			e.printStackTrace();
 		}finally {
-			if(myInput != null){
-				myInput.close();
-			}
+//			if(myInput != null){
+//				myInput.close();
+//			}
 	    }
-		
+
+		long partionMinUtility = (long) (minUtilityRatio * localPartitionUtility);
+		this.minUtility = partionMinUtility;
 		// If we are in debug mode, we will show the number of distinct items in the database,
 		// the number of sequences and the SWU of each item
 		if(DEBUG) {
@@ -169,15 +193,15 @@ public class AlgoUSpan {
 				System.out.println("Item: " + entry.getKey() + " swu: " + entry.getValue());
 			}
 		}
-		
+
 		//================  SECOND DATABASE SCAN ===================
 		// Read the database again to create the QMatrix for each sequence
 		List<QMatrix> database  = new ArrayList<QMatrix>(sequenceCount);
-		
+
 		try {
 			// prepare the object for reading the file
-			myInput = new BufferedReader(new InputStreamReader( new FileInputStream(new File(input))));
-			
+//			myInput = new BufferedReader(new InputStreamReader( new FileInputStream(new File(input))));
+
 			// We will read each sequence in buffers.
 			// The first buffer will store the items of a sequence and the -1 between them)
 			int[] itemBuffer = new int[BUFFERS_SIZE];
@@ -192,22 +216,23 @@ public class AlgoUSpan {
 			int[] itemsSequenceBuffer = new int[BUFFERS_SIZE];
 			// The following variable will contain the length of the data stored in the previous buffer
 			int itemsLength;
-			
+
 			// for each line (transaction) until the end of file
-			while ((thisLine = myInput.readLine()) != null) {
+
+			for (String thisLine : input) {
 				// if the line is  a comment, is  empty or is a kind of metadata
 				if (thisLine.isEmpty() == true || thisLine.charAt(0) == '#' || thisLine.charAt(0) == '%' || thisLine.charAt(0) == '@') {
 					continue;
 				}
-				
+
 				// We reset the two following buffer length to zero because
 				// we are reading a new sequence.
 				itemBufferLength = 0;
 				itemsLength = 0;
-				
+
 				// split the sequence according to the " " separator
-				String tokens[] = thisLine.split(" "); 
-				
+				String tokens[] = thisLine.split(" ");
+
 				// get the sequence utility (the last token on the line)
 				String sequenceUtilityString = tokens[tokens.length-1];
 				int positionColons = sequenceUtilityString.indexOf(':');
@@ -218,18 +243,18 @@ public class AlgoUSpan {
 				// This variable will be used to remember if an itemset contains at least a promising item
 				// (otherwise, the itemset will be empty).
 				boolean currentItemsetHasAPromisingItem = false;
-				
+
 				// Copy the current sequence in the sequence buffer.
 				// For each token on the line except the last three tokens
 				// (the -1 -2 and sequence utility).
 				for(int i=0; i< tokens.length -3; i++) {
 					String currentToken = tokens[i];
-					
+
 					// if empty, continue to next token
 					if(currentToken.length() == 0) {
 						continue;
 					}
-					
+
 					// if the current token is -1
 					if(currentToken.equals("-1")) {
 						// It means that it is the end of an itemset.
@@ -237,8 +262,8 @@ public class AlgoUSpan {
 						if(currentItemsetHasAPromisingItem) {
 							// If yes, then we keep the -1, because
 							// that itemset will not be empty.
-							
-							// We store the -1 in the respective buffers 
+
+							// We store the -1 in the respective buffers
 							itemBuffer[itemBufferLength] = -1;
 							utilityBuffer[itemBufferLength] = -1;
 							// We increase the length of the data stored in the buffers
@@ -246,7 +271,7 @@ public class AlgoUSpan {
 
 							// we update the number of itemsets in that sequence that are not empty
 							nbItemsets++;
-							// we reset the following variable for the next itemset that 
+							// we reset the following variable for the next itemset that
 							// we will read after this one (if there is one)
 							currentItemsetHasAPromisingItem = false;
 						}
@@ -257,41 +282,41 @@ public class AlgoUSpan {
 						int positionRightBracketString = currentToken.indexOf(']');
 						String itemString = currentToken.substring(0, positionLeftBracketString);
 						Integer item = Integer.parseInt(itemString);
-						
+
 						// We also extract the utility from the string:
 						String utilityString = currentToken.substring(positionLeftBracketString+1, positionRightBracketString);
 						Integer itemUtility = Integer.parseInt(utilityString);
-						
+
 						// it the item is promising (its SWU >= minutility), then
 						// we keep it in the sequence
-						if(mapItemToSWU.get(item) >= minUtility) {
+						if(mapItemToSWU.get(item) >= partionMinUtility) {
 							// We remember that this itemset contains a promising item
 							currentItemsetHasAPromisingItem = true;
-							
+
 							// We store the item and its utility in the buffers
 							// for temporarily storing the sequence
 							itemBuffer[itemBufferLength] = item;
 							utilityBuffer[itemBufferLength] = itemUtility;
 							itemBufferLength++;
-							
+
 							// We also put this item in the buffer for all items of this sequence
 							itemsSequenceBuffer[itemsLength++] = item;
 						}else {
-							// if the item is not promising, we subtract its utility 
+							// if the item is not promising, we subtract its utility
 							// from the sequence utility, and we do not add it to the buffers
 							// because this item will not be part of a high utility sequential pattern.
 							sequenceUtility -= itemUtility;
 						}
 					}
 				}
-				
+
 				// If the sequence utility is now zero, which means that the sequence
 				// is empty after removing unpromising items, we don't keep it
 				if(sequenceUtility == 0) {
 					continue;
 				}
 
-				// If we are in debug mode,  
+				// If we are in debug mode,
 				if(DEBUG) {
 					// We will show the original sequence
 					System.out.println("SEQUENCE BEFORE REMOVING UNPROMISING ITEMS:\n");
@@ -326,7 +351,7 @@ public class AlgoUSpan {
 						lastItemSeen = item;
 					}
 				}
-				
+
 				// If we are in debugging mode
 				if(DEBUG) {
 					// We will print the list of promising items from the sequence,
@@ -337,10 +362,10 @@ public class AlgoUSpan {
 					}
 					System.out.println();
 				}
-				
+
 				// New we count the number of items in that sequence
 				int nbItems = newItemsPos;
-				
+
 				// And we will create the Qmatrix for that sequence
 				QMatrix matrix = new QMatrix(nbItems, nbItemsets, itemsSequenceBuffer, newItemsPos, sequenceUtility);
 				// We add the QMatrix to the initial sequence database.
@@ -380,7 +405,7 @@ public class AlgoUSpan {
 							// for that item and move to the next row in the matrix.
 							matrix.registerItem(posNames, itemset, 0, sequenceUtility);
 							posNames++;
-						}else { 
+						}else {
 							// Otherwise, we put a utility of 0 for the current row in the matrix and move
 							// to the next item in the sequence
 							matrix.registerItem(posNames, itemset, 0, sequenceUtility);
@@ -388,7 +413,7 @@ public class AlgoUSpan {
 						}
 					}
 				}
-				
+
 				// if in debug mode, we print the q-matrix that we have just built
 				if(DEBUG) {
 					System.out.println(matrix.toString());
@@ -399,28 +424,15 @@ public class AlgoUSpan {
 			// catches exception if error while reading the input file
 			e.printStackTrace();
 		}finally {
-			if(myInput != null){
-				// close the input file
-				myInput.close();
-			}
+//			if(myInput != null){
+//				// close the input file
+//				myInput.close();
+//			}
 	    }
-		
-		// check the memory usage
-		MemoryLogger.getInstance().checkMemory();
-
-		// Mine the database recursively using the USpan procedure
-		// This procedure is the USPan procedure optimized for the first recursion
-		uspanFirstTime(patternBuffer, 0, database);
-		
-		// check the memory usage again and close the file.
-		MemoryLogger.getInstance().checkMemory();
-		// close output file
-		writer.close();
-		// record end time
-		endTimestamp = System.currentTimeMillis();
+		this.database = database;
 	}
 
-	
+
 	/**
 	 * This is the initial call to the USpan procedure to find all High utility sequential patterns
 	 * of length 1. It is optimized for finding patterns of length 1. 
@@ -430,7 +442,7 @@ public class AlgoUSpan {
 	 * @param database This is the original sequence database (as a set of QMatrix)
 	 * @throws IOException If an error occurs while reading/writting to file.
 	 */
-	private void uspanFirstTime(int[] prefix, int prefixLength, List<QMatrix> database) throws IOException {
+	private void uspanFirstTime(int[] prefix, int prefixLength) throws IOException {
 		
 		// For the first call to USpan, we only need to check I-CONCATENATIONS
 		// =======================  I-CONCATENATIONS  ===========================/
@@ -523,8 +535,11 @@ public class AlgoUSpan {
 				// create the pattern consisting of this item
 				// by appending the item to the prefix in the buffer, which is empty
 				prefix[0] = item;
+				TreeNode node = new TreeNode(item,totalUtility, totalUtility + totalRemainingUtility );
+				theTree.addTreeNode(node);
 				// if the pattern is high utility, then output it
 				if(totalUtility >= minUtility) {
+					node.isPromising = true;
 					writeOut(prefix,1, totalUtility);
 				}
 //				//Tin checks:
@@ -539,7 +554,7 @@ public class AlgoUSpan {
 					//Then, we recursively call the procedure uspan for growing this pattern and
 					// try to find larger high utility sequential patterns
 					if(1 < maxPatternLength) {
-						uspan(prefix, 1, matrixProjections, 1);
+						uspan(prefix, 1, matrixProjections, 1, node);
 					}
 				}
 			}
@@ -566,13 +581,14 @@ public class AlgoUSpan {
 	/**
 	 * This is the general USpan procedure to find all High utility sequential patterns of length
 	 * greater than 1. 
-	 * @param prefix  This is the buffer for storing the current prefix.
-	 * @param prefixLength The current prefix length. 
 	 * @param database This is a projected sequence database (a set of projected QMatrixes)
+	 * @param prefix  This is the buffer for storing the current prefix.
+	 * @param prefixLength The current prefix length.
 	 * @param itemCount the number of items in the prefix
+	 * @param node
 	 * @throws IOException If an error occurs while reading/writting to file.
 	 */
-	private void uspan(int[] prefix, int prefixLength, List<QMatrixProjection> projectedDatabase, int itemCount) throws IOException {
+	private void uspan(int[] prefix, int prefixLength, List<QMatrixProjection> projectedDatabase, int itemCount, TreeNode parentNode) throws IOException {
 		if(DEBUG){
 			// Print the current prefix
 			for(int i=0; i< prefixLength; i++){
@@ -737,8 +753,11 @@ public class AlgoUSpan {
 				
 				// create the i-concatenation by appending the item to the prefix in the buffer
 				prefix[prefixLength] = item;
+				TreeNode node = new TreeNode(item, totalUtility, totalUtility + totalRemainingUtility);
+				parentNode.addTreeNode(node);
 				// if the i-concatenation is high utility, then output it
 				if(totalUtility >= minUtility) {
+					node.isPromising = true;
 					writeOut(prefix,prefixLength+1, totalUtility);
 				}
 				
@@ -754,10 +773,17 @@ public class AlgoUSpan {
 					// Finally, we recursively call the procedure uspan for growing this pattern
 					// to try to find larger patterns
 					if(itemCount+1 < maxPatternLength) {
-						uspan(prefix, prefixLength+1, matrixProjections, itemCount+1);
+						uspan(prefix, prefixLength+1, matrixProjections, itemCount+1, node);
 					}
 					
 				}
+				else {
+					node.interInfo = matrixProjections;
+				}
+			}
+			else{
+				TreeNode node = new TreeNode(entry.getKey(), 0, itemSWU.swu);
+				parentNode.addTreeNode(node);
 			}
 		}
 		
@@ -927,8 +953,22 @@ public class AlgoUSpan {
 				prefix[prefixLength] = -1;
 				// then we append the new item
 				prefix[prefixLength+1] = item;
+
+				TreeNode node;
+				TreeNode currentParent;
+				int index;
+				if ((index = parentNode.isChildExist(-1))>=0){ // -1 is one of the child of the parent node
+					currentParent = parentNode.getChildren(index);
+				}else {
+					currentParent = new TreeNode(-1);
+					parentNode.addTreeNode(currentParent);
+				}
+				node = new TreeNode(item, totalUtility, totalUtility + totalRemainingUtility);
+				currentParent.addTreeNode(node);
+
 				// if this s-concatenation is high utility, then we output it
 				if(totalUtility >= minUtility) {
+					node.isPromising = true;
 					writeOut(prefix,prefixLength+2, totalUtility);
 				}
 				
@@ -945,9 +985,22 @@ public class AlgoUSpan {
 					// Finally, we recursively call the procedure uspan() for growing this pattern
 					// to try to find larger high utilit sequential patterns
 					if(itemCount+1 < maxPatternLength) {
-						uspan(prefix, prefixLength+2, matrixProjections, itemCount+1);
+						uspan(prefix, prefixLength+2, matrixProjections, itemCount+1, node);
 					}
 				}
+			}
+			else{
+				TreeNode node;
+				TreeNode currentParent;
+				int index;
+				if ((index = parentNode.isChildExist(-1))>=0){ // -1 is one of the child of the parent node
+					currentParent = parentNode.getChildren(index);
+				}else {
+					currentParent = new TreeNode(-1);
+					parentNode.addTreeNode(currentParent);
+				}
+				node = new TreeNode(entry.getKey(), 0, itemSWU.swu);
+				currentParent.addTreeNode(node);
 			}
 		}
 		// We check the memory usage
@@ -1011,11 +1064,14 @@ public class AlgoUSpan {
 			buffer.append(")>:");
 			buffer.append(utility);
 		}
-		
+		ArrayList<Object> objects = new ArrayList<Object>(2);
+		objects.add(partitionId);
+		objects.add(utility);
+		result.put(buffer.toString(), objects);
 		// write the pattern to the output file
-		writer.write(buffer.toString());
-		writer.newLine();
-		
+//		writer.write(buffer.toString());
+//		writer.newLine();
+
 		// if in debugging mode, then also print the pattern to the console
 		if(DEBUG) {
 			System.out.println(" SAVING : " + buffer.toString());
@@ -1220,3 +1276,4 @@ System.in.read();
 		System.out.println("========================================================");
 	}
 }
+
